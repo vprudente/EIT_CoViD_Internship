@@ -8,6 +8,9 @@ from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 import cv2
 import pandas as pd
 #from cmap_map import cmap_map
+import SimpleITK as sitk
+import six
+from radiomics import featureextractor, getTestCase
 
 #importing data
 file_path = 'Sample_EIT_Data/'
@@ -31,22 +34,23 @@ section = data['section'][0]
 
 #define a funcion to normalize data within Patient/PEEP Trial/PEEP Level
 def norm_PEEP(data, variable, level='trial'):
-    min_ = 0
-    max_ = 0
+    #Inter-quantile Normalization
+    q5 = 0  #quantile 5%
+    q95 = 0 #quantile 95%
     data_norm = np.copy(data)
     if level=='trial':
         #finding smallest and biggest variable values
         for i in range(data.shape[0]):
             if i==0:
-                min_ = np.min(data[i][variable])
-                max_ = np.max(data[i][variable])
+                q5 = np.quantile(data[i][variable],0.05)
+                q95 = np.quantile(data[i][variable],0.95)
             else:
-                if np.min(data[i][variable])<min_:
-                    min_ = np.min(data[i][variable])
-                if np.max(data[i][variable])>max_:
-                    max_ = np.max(data[i][variable])
+                if np.quantile(data[i][variable],0.05) < q5:
+                    q5 = np.quantile(data[i][variable],0.05)
+                if np.quantile(data[i][variable],0.95) > q95:
+                    q95 = np.quantile(data[i][variable],0.95)
         #computing the value's range
-        var_range = abs(min_)+abs(max_)
+        var_range = abs(q5)+abs(q95)
         #normalize through division of every value by range?
         for i in range(data.shape[0]):
             data_norm[i][variable] = data[i][variable]/var_range
@@ -55,10 +59,10 @@ def norm_PEEP(data, variable, level='trial'):
     elif level=='level':
         #finding smallest and biggest variable values
         for i in range(data.shape[0]):
-            min_ = np.min(data[i][variable])
-            max_ = np.max(data[i][variable])
+            q5 = np.quantile(data[i][variable],0.05)
+            q95 = np.quantile(data[i][variable],0.95)
             #computing the value's range
-            var_range = abs(min_)+abs(max_)
+            var_range = abs(q5)+abs(q95)
             #normalize through division of every value by range?
             data_norm[i][variable] = data[i][variable]/var_range
         return data_norm
