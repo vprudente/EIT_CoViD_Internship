@@ -9,12 +9,13 @@ import cv2
 import pandas as pd
 #from cmap_map import cmap_map
 import SimpleITK as sitk
-import six
-from radiomics import featureextractor, getTestCase
+from radiomics import featureextractor, getTestCase, firstorder
+from collections import defaultdict
+
 
 #importing data
-file_path = 'Sample_EIT_Data/'
-file_name = os.path.join(file_path,"COV077_05.mat")
+file_path = r'C:\Users\Vasco\Documents\Ms Data Science\3Semester\Code\EIT_CoViD_Internship'
+file_name = os.path.join(file_path,'Sample_EIT_Data',"COV077_05.mat")
 data = io.loadmat(file_name)
 
 #function to get a dictionary of the variable names and indexes
@@ -105,13 +106,22 @@ for i in range(dzMov_norm.shape[0]):
             ax3 = fig3.add_subplot(5,dzMov_norm2[i][idx].shape[0]/5+1,j+1)
             ax3.imshow(img, cmap='twilight', vmin=-1, vmax=1)
             ax3.axis('off')
-        plt.show()
+        #plt.show()
 
 # Plotting the images for the differentiation of 2 consecutive frames of PEEP-Trial normalized data
+
+params = os.path.join(file_path, "ParamsSettings_Pyradiomics_Params.yaml")
+extractor = featureextractor.RadiomicsFeatureExtractor(params)
 for i in range(dzMov_norm.shape[0]):
         fig4 = plt.figure('Diff_Norm')
+        #Get PEEP level
         PEEPlvl=dzMov_norm[i][dict_var_section['PEEP']][0][0]
-
+        #Get PEEP level lung shape
+        lung_Shape = np.reshape(data['section'][0][8][dict_var_section['lLungShape32']],(32,32)).copy()
+        lung_Shape = sitk.GetImageFromArray(lung_Shape)
+        #Create a dict to save the features
+        d = defaultdict(list)
+        #Compute the differentiation between 2 consecutive images and extract features
         for j in range(dzMov_norm[i][idx].shape[0]):
             if j==0:
                 img1=section[i][idx][j]
@@ -123,6 +133,17 @@ for i in range(dzMov_norm.shape[0]):
             ax4 = fig4.add_subplot(5,section[i][idx].shape[0]/5+1,j+1)
             ax4.imshow(img_diff, cmap='twilight', vmin=-0.01, vmax=0.01)
             ax4.axis('off')
+            img_diff = sitk.GetImageFromArray(img_diff)
+            result = pd.Series(extractor.execute(img_diff,lung_Shape))
+            for k,v in result.items():
+                    d[k].append(v)
+        d = pd.DataFrame(d)
+        d.T.to_csv(os.path.join(file_path, "features",f"{str(i)}.csv"))
+
+
         fig4.suptitle('Diif Norm -> PEEP: '+str(PEEPlvl))
-        plt.show()
+        #plt.show()
+
+
+#result = firstorder.RadiomicsFirstOrder(img,lung_Shape)
 
