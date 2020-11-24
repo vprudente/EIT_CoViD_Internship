@@ -16,7 +16,7 @@ def get_dict_var_names(data):
     return dict_var_data
 
 #define a funcion to normalize data within Patient/PEEP Trial/PEEP Level
-def norm_PEEP(data, variable, level='Trial'):
+def norm_PEEP(data, variable, level='Trial', thresh=True):
     #Inter-quantile Normalization
     q1 = 0  #quantile 1%
     q99 = 0 #quantile 99%
@@ -36,6 +36,10 @@ def norm_PEEP(data, variable, level='Trial'):
         var_range = abs(q1)+abs(q99)
         #normalize through division of every value by range
         for i in range(data.shape[0]):
+            # Threshold to contain only value between quantiles 1% and 99%
+            if thresh:
+                data_norm[i][variable] = np.clip(data_norm[i][variable], q1, q99)
+            # Normalize
             data_norm[i][variable] = (data[i][variable].copy()-q1)/var_range
         return data_norm
 
@@ -46,6 +50,9 @@ def norm_PEEP(data, variable, level='Trial'):
             q99 = np.quantile(data[i][variable],0.99)
             #computing the value's range
             var_range = abs(q1)+abs(q99)
+            # Threshold to contain only value between quantiles 1% and 99%
+            if thresh:
+                data_norm[i][variable] = np.clip(data_norm[i][variable], q1, q99)
             #normalize through division of every value by range
             data_norm[i][variable] = (data[i][variable].copy()-q1)/var_range
         return data_norm
@@ -111,6 +118,9 @@ def feature_extraction(file, params, out_path=None, img_type='Original'):
         PEEPlvl=section[i][dict_var_section['PEEP']][0][0]
         #Get PEEP level lung shape
         lung_Shape = np.reshape(section[i][dict_var_section['lLungShape32']],(32,32)).copy()
+        # Dilate and erode the lung shape to remove eventual holes in the mask
+        lung_Shape = cv2.dilate(lung_Shape, np.ones((2,2)))
+        lung_Shape = cv2.erode(lung_Shape, np.ones((2,2)))
         lung_Shape = sitk.GetImageFromArray(lung_Shape)
         #Create a dict to save the features
         d = defaultdict(list)
