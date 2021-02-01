@@ -106,10 +106,9 @@ for i in range(dzMov_norm.shape[0]):
             ax3 = fig3.add_subplot(5,dzMov_norm2[i][idx].shape[0]/5+1,j+1)
             ax3.imshow(img, cmap='twilight', vmin=-1, vmax=1)
             ax3.axis('off')
-        #plt.show()
+        # plt.show()
 
 # Plotting the images for the differentiation of 2 consecutive frames of PEEP-Trial normalized data
-
 params = os.path.join(file_path, "ParamsSettings_Pyradiomics_Params.yaml")
 extractor = featureextractor.RadiomicsFeatureExtractor(params)
 for i in range(dzMov_norm.shape[0]):
@@ -138,12 +137,50 @@ for i in range(dzMov_norm.shape[0]):
             for k,v in result.items():
                     d[k].append(v)
         d = pd.DataFrame(d)
-        d.T.to_csv(os.path.join(file_path, "features",f"{str(i)}.csv"))
+        #d.T.to_csv(os.path.join(file_path, "features",f"{str(i)}.csv"))
 
 
-        fig4.suptitle('Diif Norm -> PEEP: '+str(PEEPlvl))
-        #plt.show()
+        fig4.suptitle('Diff Norm -> PEEP: '+str(PEEPlvl))
+        # plt.show()
 
-
-#result = firstorder.RadiomicsFirstOrder(img,lung_Shape)
-
+for i in range(dzMov_norm.shape[0]):
+    fig5 = plt.figure('Optical Flow')
+    fig6 = plt.figure('Optical Flow Quiver')
+    #Get PEEP level
+    PEEPlvl=dzMov_norm[i][dict_var_section['PEEP']][0][0]
+    #Get PEEP level lung shape
+    lung_Shape = np.reshape(data['section'][0][i][dict_var_section['lLungShape32']],(32,32)).copy()
+    lung_Shape = sitk.GetImageFromArray(lung_Shape)
+    #Compute the differentiation between 2 consecutive images and extract features
+    mask = np.zeros((32,32,3))  
+    # Sets image saturation to maximum 
+    mask[:,:, 1] = np.reshape(lung_Shape,(32,32))
+    for j in range(dzMov_norm[i][idx].shape[0]):
+        if j==0:
+            img1=np.reshape(section[i][idx][j],(32,32))
+            continue
+        img2=np.copy(img1)
+        img1=np.reshape(section[i][idx][j],(32,32))
+        #get the vector field (in catesian coordinates)
+        flow = cv2.calcOpticalFlowFarneback(img2,img1,None,0.5, 3, 15, 3, 5, 1.1, 0)
+        #get the vector field (in degrees coordinates)
+        magnitude, angle = cv2.cartToPolar(flow[:,:,0], flow[:,:,1])
+        # Sets image hue according to the optical flow  direction 
+        # mask[:,:, 0] = angle * 180 / np.pi / 2
+        mask[...,0] = cv2.normalize(angle,None,0,359,cv2.NORM_MINMAX)
+        # Sets image value according to the optical flow magnitude (normalized) 
+        mask[:,:, 2] = cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX)
+        mask = mask.astype('float32')
+        # Converts HSV to RGB (BGR) color representation 
+        rgb = cv2.cvtColor(mask, cv2.COLOR_HSV2RGB)
+        ax5 = fig5.add_subplot(5,section[i][idx].shape[0]/5+1,j+1)
+        ax5.imshow(rgb, cmap='twilight', vmin=-0.01, vmax=0.01)
+        ax5.axis('off')
+        # Plot quiver vector field
+        ax6 = fig6.add_subplot(5,section[i][idx].shape[0]/5+1,j+1)
+        step = 3
+        plt.quiver(np.arange(0, flow.shape[1], step), np.arange(flow.shape[0], -1, -step), flow[::step, ::step, 0], flow[::step, ::step, 1])
+        ax6.axis('off')
+    fig5.suptitle('Optical Flow -> PEEP: '+str(PEEPlvl))
+    fig6.suptitle('Optical Flow Quiver -> PEEP: '+str(PEEPlvl))
+    plt.show()

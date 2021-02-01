@@ -104,8 +104,11 @@ def feature_extraction(file, params, out_path=None, img_type='Original'):
     #Create a (main) Pandas DateFrame to save the results
     RESULT = pd.DataFrame()
     #Find patient name and trial number
-    name = find_name(file,'Sample_EIT_Data\\','.mat')
+    name = find_name(file,os.path.dirname(file),'.mat')
+    name = name.replace('\\','')
     name = name.split('_')
+    if len(name)==1:
+        name.append('00')
     # Transform (Normalize) dzMov
     if img_type!='Original':
         if img_type=='Diff':
@@ -134,10 +137,11 @@ def feature_extraction(file, params, out_path=None, img_type='Original'):
         #convert d to a Pandas DataFrame and export it to a .csv file
         d = pd.DataFrame(d)
         d['PEEPLvl'] = PEEPlvl
-        d_agg = d.aggregate('mean', axis='rows')
-        d_agg['Patient'] = name[0]
-        d_agg['PEEPTrial_Num'] = name[1]
-        RESULT = pd.concat([RESULT,d_agg],axis=1)
+        # d_agg = d.aggregate('mean', axis='rows')
+        d['Frame'] = np.linspace(1, d.shape[0], d.shape[0])
+        d['Patient'] = name[0]
+        d['PEEPTrial_Num'] = name[1]
+        RESULT = pd.concat([RESULT,d.T],axis=1)
 
         # Create a directory for the results file
         if out_path == None:
@@ -148,4 +152,4 @@ def feature_extraction(file, params, out_path=None, img_type='Original'):
         # d.to_csv(os.path.join(out_path,f"Patient_{name[0]}_Trial{name[1]}_PEEP{int(PEEPlvl)}.csv"))
         # d_agg.T.to_csv(os.path.join(out_path,f"Agg_Patient_{name[0]}_Trial{name[1]}_PEEP{int(PEEPlvl)}.csv"))
     # Export results
-    RESULT.T.to_csv(os.path.join(out_path,f"Agg_Patient_{name[0]}_Trial{name[1]}.csv"), index=False)
+    RESULT.T.to_csv(os.path.join(out_path,f"Non-Agg_Patient_{name[0]}_Trial{name[1]}.csv"), index=False)
